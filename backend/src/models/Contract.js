@@ -9,15 +9,22 @@ const contractSchema = mongoose.Schema({
     amount: { type: Number, required: true },
     days: { type: Number, required: true }
   },
+  // We allow storing the link directly here now
+  workSubmission: {
+    link: String,
+    notes: String,
+    submittedAt: Date
+  },
   status: {
     type: String,
-    enum: ['ACTIVE', 'COMPLETED', 'DISPUTED', 'CANCELLED'],
+    // ADDED 'WORK_SUBMITTED' to the allowed list
+    enum: ['ACTIVE', 'WORK_SUBMITTED', 'COMPLETED', 'DISPUTED', 'CANCELLED'],
     default: 'ACTIVE'
   },
   escrowStatus: {
     type: String,
     enum: ['HELD', 'RELEASED', 'REFUNDED'],
-    default: 'HELD' // Money is locked immediately upon hiring
+    default: 'HELD'
   }
 }, { timestamps: true });
 

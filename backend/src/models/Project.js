@@ -9,12 +9,11 @@ const projectSchema = mongoose.Schema({
   visibility: { type: String, enum: ['public', 'private'], default: 'public' },
   status: { 
     type: String, 
-    enum: ['OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], 
+    // ADDED 'WORK_SUBMITTED' to the allowed list
+    enum: ['OPEN', 'IN_PROGRESS', 'WORK_SUBMITTED', 'COMPLETED', 'CANCELLED'], 
     default: 'OPEN' 
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  
-  // NEW: Checklist System
   checklist: [{
     text: { type: String, required: true },
     isCompleted: { type: Boolean, default: false }

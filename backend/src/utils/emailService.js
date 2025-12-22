@@ -1,20 +1,18 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-  // 1. Check if email credentials exist in .env
   if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
     console.log('----------------------------------------------------');
     console.log('⚠️  NO EMAIL SERVER CONFIGURED. MOCK EMAIL SENT:');
     console.log(`To: ${options.email}`);
     console.log(`Subject: ${options.subject}`);
-    console.log(`Message: ${options.message}`);
+    if(options.attachments) console.log(`[Attachment: ${options.attachments[0].filename}]`);
     console.log('----------------------------------------------------');
     return;
   }
 
-  // 2. If credentials exist, send real email
   const transporter = nodemailer.createTransport({
-    service: 'gmail', // or 'SendGrid', 'Mailgun'
+    service: 'gmail', 
     auth: {
       user: process.env.SMTP_EMAIL,
       pass: process.env.SMTP_PASSWORD,
@@ -26,6 +24,7 @@ const sendEmail = async (options) => {
     to: options.email,
     subject: options.subject,
     text: options.message,
+    attachments: options.attachments
   };
 
   await transporter.sendMail(message);

@@ -1,8 +1,9 @@
 const Contract = require('../models/Contract');
 const Project = require('../models/Project');
 const Bid = require('../models/Bid');
+const { generateInvoice } = require('../utils/invoiceGenerator');
+const sendEmail = require('../utils/emailService');
 
-// Hire Contractor
 const createContract = async (req, res) => {
   try {
     const { bidId } = req.body;
@@ -30,7 +31,6 @@ const createContract = async (req, res) => {
   }
 };
 
-// Get MY Contracts (The Missing Link!)
 const getMyContracts = async (req, res) => {
   try {
     const contracts = await Contract.find({ contractor: req.user._id })
@@ -42,7 +42,6 @@ const getMyContracts = async (req, res) => {
   }
 };
 
-// Deliver Work
 const deliverWork = async (req, res) => {
   try {
     const { projectId, workLink, notes } = req.body;
@@ -54,16 +53,59 @@ const deliverWork = async (req, res) => {
 
     if (!contract) return res.status(404).json({ message: 'No active contract found.' });
 
-    contract.status = 'COMPLETED'; 
-    contract.escrowStatus = 'RELEASED'; 
+    contract.status = 'WORK_SUBMITTED'; 
     await contract.save();
+    await Project.findByIdAndUpdate(projectId, { status: 'WORK_SUBMITTED' });
 
-    await Project.findByIdAndUpdate(projectId, { status: 'COMPLETED' });
-
-    res.json({ message: 'Work submitted successfully!' });
+    res.json({ message: 'Work submitted! Waiting for client approval.' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-module.exports = { createContract, getMyContracts, deliverWork };
+const releasePayment = async (req, res) => {
+  try {
+    // Smart Lookup: Pehle Contract ID se dhundega, nahi mila to Project ID se
+    let contract = await Contract.findById(req.params.id)
+      .populate('project').populate('client').populate('contractor');
+    
+    if (!contract) {
+       contract = await Contract.findOne({ project: req.params.id })
+        .populate('project').populate('client').populate('contractor');
+    }
+
+    if (!contract) return res.status(404).json({ message: 'Contract not found' });
+
+    if (contract.client._id.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not Authorized' });
+    }
+
+    contract.status = 'COMPLETED';
+    contract.escrowStatus = 'RELEASED';
+    await contract.save();
+    
+    await Project.findByIdAndUpdate(contract.project._id, { status: 'COMPLETED' });
+
+    // Generate Invoice PDF
+    const invoicePdfBase64 = await generateInvoice(contract.terms, contract.contractor, contract.client);
+
+    // Email Invoice
+    await sendEmail({
+      email: contract.client.email, 
+      subject: `Payment Receipt - ${contract.project.title}`,
+      message: `You have released payment of $${contract.terms.amount}. Attached is your invoice.`,
+      attachments: [{
+          filename: `Invoice_${contract._id}.pdf`,
+          content: invoicePdfBase64,
+          encoding: 'base64'
+      }]
+    });
+
+    res.json({ message: 'Payment released and Invoice sent!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = { createContract, getMyContracts, deliverWork, releasePayment };

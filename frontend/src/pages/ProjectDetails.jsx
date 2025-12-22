@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import AuthContext from '../context/AuthContext';
-import { ArrowLeft, Star, ListTodo, Square, CheckSquare } from 'lucide-react';
+import { ArrowLeft, ListTodo, Square, CheckSquare, ExternalLink, CheckCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const ProjectDetails = () => {
@@ -30,11 +30,11 @@ const ProjectDetails = () => {
         const { data } = await api.get(`/projects/${id}`);
         setProject(data);
         
-        // Only fetch bids if I am the owner
         if (user && data.createdBy._id === user._id) {
           const bidsRes = await api.get(`/bids/${id}`);
           setBids(bidsRes.data);
         }
+        
         if (data.status === 'COMPLETED') {
             const reviewRes = await api.get(`/reviews/${id}`);
             setReviews(reviewRes.data);
@@ -44,7 +44,6 @@ const ProjectDetails = () => {
     fetchData();
   }, [id, user]);
 
-  // --- ACTIONS ---
   const handleToggleTask = async (itemId) => {
     try {
         const { data } = await api.patch(`/projects/${id}/checklist`, { itemId });
@@ -55,7 +54,6 @@ const ProjectDetails = () => {
   const handlePlaceBid = async (e) => {
     e.preventDefault();
     if (!user) { toast.error("Please login to bid"); navigate('/login'); return; }
-    
     try { await api.post(`/bids/${id}`, { bidAmount, daysToComplete: days, proposal }); toast.success("Bid placed!"); window.location.reload(); } 
     catch (error) { toast.error("Failed to place bid"); }
   };
@@ -68,9 +66,20 @@ const ProjectDetails = () => {
 
   const handleSubmitWork = async (e) => {
     e.preventDefault();
-    if(!window.confirm("Submit work?")) return;
-    try { await api.post('/contracts/deliver', { projectId: id, workLink, notes }); toast.success("Work Submitted!"); window.location.reload(); } 
+    if(!window.confirm("Submit work for review?")) return;
+    try { await api.post('/contracts/deliver', { projectId: id, workLink, notes }); toast.success("Work Submitted for Review!"); window.location.reload(); } 
     catch (error) { toast.error("Failed to submit."); }
+  };
+
+  const handleReleasePayment = async () => {
+     if(!window.confirm("Release Payment and Generate Invoice?")) return;
+     try { 
+        // Backend now supports finding contract by Project ID directly
+        await api.put(`/contracts/${id}/pay`); 
+        toast.success("Payment Released! (Invoice sent to Email)");
+        window.location.reload();
+     } 
+     catch (error) { toast.error("Failed to release payment"); }
   };
 
   const handleSubmitReview = async (e) => {
@@ -82,10 +91,10 @@ const ProjectDetails = () => {
   if (loading) return <div className="p-10 text-center">Loading...</div>;
   if (!project) return null;
 
-  // --- SAFE ROLE CHECKS ---
   const isOwner = user && project.createdBy._id === user._id;
   const isContractor = user && !isOwner && user.role === 'Contractor';
   const allTasksCompleted = project.checklist && project.checklist.every(t => t.isCompleted);
+  const isWorkSubmitted = project.status === 'WORK_SUBMITTED';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
@@ -107,14 +116,15 @@ const ProjectDetails = () => {
             <div className="mt-4 flex items-center gap-4">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                     project.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 
-                    project.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                }`}>{project.status}</span>
+                    project.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 
+                    project.status === 'WORK_SUBMITTED' ? 'bg-purple-100 text-purple-800' : 
+                    'bg-gray-100 text-gray-800'
+                }`}>{project.status.replace('_', ' ')}</span>
                 <span className="text-sm text-gray-500">Due: {new Date(project.deadline).toLocaleDateString()}</span>
             </div>
 
             <p className="mt-6 text-gray-700 whitespace-pre-wrap">{project.description}</p>
 
-            {/* Checklist Display */}
             {project.checklist && project.checklist.length > 0 && (
                 <div className="mt-8 bg-gray-50 p-4 rounded-lg border">
                     <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
@@ -145,7 +155,36 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        {/* 1. BIDDING - Only show if user exists AND is contractor */}
+        {isOwner && isWorkSubmitted && (
+             <div className="bg-white shadow rounded-lg px-6 py-8 border-l-4 border-purple-500 mb-8">
+                <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                    <CheckCircle className="text-purple-600"/> Review Work Submission
+                </h3>
+                <p className="text-gray-600 mb-4">The contractor has marked this job as complete. Please review the deliverables.</p>
+                <div className="bg-gray-50 p-4 rounded mb-6 flex items-center justify-between">
+                    <span className="font-mono text-sm text-gray-600">Work Link Submitted</span>
+                    <a href="#" className="text-blue-600 hover:underline flex items-center gap-1">
+                        View Files <ExternalLink className="w-4 h-4" />
+                    </a>
+                </div>
+                <div className="flex gap-4">
+                    <button onClick={handleReleasePayment} className="flex-1 bg-green-600 text-white py-3 rounded font-bold hover:bg-green-700 transition-colors shadow-lg">
+                        Approve & Pay Invoice
+                    </button>
+                    <button className="px-6 py-3 border border-red-200 text-red-600 rounded hover:bg-red-50 font-medium">
+                        Request Revision
+                    </button>
+                </div>
+             </div>
+        )}
+
+        {isContractor && isWorkSubmitted && (
+             <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 mb-8 text-center">
+                 <h3 className="text-lg font-bold text-purple-900">Work Submitted for Review</h3>
+                 <p className="text-purple-700">Waiting for client to release payment.</p>
+             </div>
+        )}
+
         {isContractor && project.status === 'OPEN' && (
           <div className="bg-white shadow rounded-lg px-6 py-8">
             <h3 className="text-xl font-bold mb-4">Place a Bid</h3>
@@ -161,9 +200,8 @@ const ProjectDetails = () => {
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">Cover Letter / Proposal</label>
+                    <label className="block text-sm font-medium text-gray-700">Proposal</label>
                     <textarea 
-                        placeholder="Why are you the best fit?" 
                         className="w-full border p-2 rounded mt-1 resize-none overflow-hidden min-h-[80px]" 
                         value={proposal} 
                         onChange={e => {
@@ -179,7 +217,6 @@ const ProjectDetails = () => {
           </div>
         )}
 
-        {/* 2. SUBMIT WORK */}
         {isContractor && project.status === 'IN_PROGRESS' && (
            <div className="bg-white shadow rounded-lg px-6 py-8 border-l-4 border-blue-500">
              <h3 className="text-xl font-bold mb-4">Submit Work</h3>
@@ -195,43 +232,20 @@ const ProjectDetails = () => {
                   disabled={!allTasksCompleted}
                   className={`w-full py-2 rounded font-bold transition-colors ${
                       allTasksCompleted 
-                      ? 'bg-green-600 text-white hover:bg-green-700' 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
                >
-                  {allTasksCompleted ? "Submit for Payment" : "Complete Checklist First"}
+                  {allTasksCompleted ? "Submit for Review" : "Complete Checklist First"}
                </button>
              </form>
            </div>
         )}
 
-        {/* 3. REVIEWS */}
-        {project.status === 'COMPLETED' && (
-            <div className="bg-white shadow rounded-lg px-6 py-8">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Star className="text-yellow-400" /> Reviews</h3>
-                {reviews.map(r => (
-                    <div key={r._id} className="border p-4 rounded bg-gray-50 mb-4">
-                        <div className="font-bold">{r.reviewer.name} <span className="text-yellow-500">{'★'.repeat(r.rating)}</span></div>
-                        <p>"{r.comment}"</p>
-                    </div>
-                ))}
-                {user && !reviews.some(r => r.reviewer._id === user._id) && (
-                    <form onSubmit={handleSubmitReview} className="mt-6 border-t pt-4 space-y-4">
-                        <select value={rating} onChange={e=>setRating(Number(e.target.value))} className="border p-2 rounded w-full">
-                            <option value="5">5 Stars</option><option value="4">4 Stars</option><option value="3">3 Stars</option><option value="1">1 Star</option>
-                        </select>
-                        <textarea placeholder="Write a review..." className="w-full border p-2 rounded" value={reviewComment} onChange={e=>setReviewComment(e.target.value)} required />
-                        <button className="bg-primary text-white px-6 py-2 rounded">Post Review</button>
-                    </form>
-                )}
-            </div>
-        )}
-
-        {/* 4. AGENT VIEW (Bids) */}
         {isOwner && project.status === 'OPEN' && (
           <div className="bg-white shadow rounded-lg px-6 py-8 mt-8">
             <h3 className="text-xl font-bold mb-4">Received Bids ({bids.length})</h3>
-            {bids.length === 0 ? <p className="text-gray-500 italic">No bids yet. Waiting for contractors...</p> :
+            {bids.length === 0 ? <p className="text-gray-500 italic">No bids yet.</p> :
               <div className="space-y-4">
                   {bids.map(bid => (
                     <div key={bid._id} className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow bg-gray-50">
@@ -242,14 +256,10 @@ const ProjectDetails = () => {
                            </div>
                            <div className="text-right">
                                <span className="block text-2xl font-bold text-green-600">${bid.bidAmount}</span>
-                               <span className="block text-sm text-gray-500">{bid.daysToComplete} Days delivery</span>
+                               <span className="block text-sm text-gray-500">{bid.daysToComplete} Days</span>
                            </div>
                        </div>
-                       
-                       <div className="bg-white p-3 rounded border border-gray-100 my-3 text-gray-700 italic">
-                           "{bid.proposal}"
-                       </div>
-
+                       <p className="bg-white p-3 rounded border border-gray-100 my-3 text-gray-700 italic">"{bid.proposal}"</p>
                        <div className="flex justify-end">
                            <button onClick={() => handleHire(bid._id)} className="bg-gray-900 text-white px-6 py-2 rounded font-medium hover:bg-black transition-colors shadow-sm">
                                Accept & Hire
