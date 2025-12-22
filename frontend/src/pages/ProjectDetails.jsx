@@ -74,7 +74,6 @@ const ProjectDetails = () => {
   const handleReleasePayment = async () => {
      if(!window.confirm("Release Payment and Generate Invoice?")) return;
      try { 
-        // Backend now supports finding contract by Project ID directly
         await api.put(`/contracts/${id}/pay`); 
         toast.success("Payment Released! (Invoice sent to Email)");
         window.location.reload();
@@ -163,7 +162,8 @@ const ProjectDetails = () => {
                 <p className="text-gray-600 mb-4">The contractor has marked this job as complete. Please review the deliverables.</p>
                 <div className="bg-gray-50 p-4 rounded mb-6 flex items-center justify-between">
                     <span className="font-mono text-sm text-gray-600">Work Link Submitted</span>
-                    <a href="#" className="text-blue-600 hover:underline flex items-center gap-1">
+                    {/* HERE IS THE FIX: Using project.workSubmissionLink */}
+                    <a href={project.workSubmissionLink || "#"} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
                         View Files <ExternalLink className="w-4 h-4" />
                     </a>
                 </div>

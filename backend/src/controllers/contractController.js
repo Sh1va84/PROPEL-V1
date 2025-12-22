@@ -54,8 +54,14 @@ const deliverWork = async (req, res) => {
     if (!contract) return res.status(404).json({ message: 'No active contract found.' });
 
     contract.status = 'WORK_SUBMITTED'; 
+    contract.workSubmission = { link: workLink, notes: notes };
     await contract.save();
-    await Project.findByIdAndUpdate(projectId, { status: 'WORK_SUBMITTED' });
+
+    // FIX: Save the link to the Project model too!
+    await Project.findByIdAndUpdate(projectId, { 
+        status: 'WORK_SUBMITTED',
+        workSubmissionLink: workLink 
+    });
 
     res.json({ message: 'Work submitted! Waiting for client approval.' });
   } catch (error) {
@@ -65,7 +71,6 @@ const deliverWork = async (req, res) => {
 
 const releasePayment = async (req, res) => {
   try {
-    // Smart Lookup: Pehle Contract ID se dhundega, nahi mila to Project ID se
     let contract = await Contract.findById(req.params.id)
       .populate('project').populate('client').populate('contractor');
     
@@ -86,22 +91,24 @@ const releasePayment = async (req, res) => {
     
     await Project.findByIdAndUpdate(contract.project._id, { status: 'COMPLETED' });
 
-    // Generate Invoice PDF
-    const invoicePdfBase64 = await generateInvoice(contract.terms, contract.contractor, contract.client);
+    // Try/Catch block prevents crashes if Email/PDF fails
+    try {
+        const invoicePdfBase64 = await generateInvoice(contract.terms, contract.contractor, contract.client);
+        await sendEmail({
+        email: contract.client.email, 
+        subject: `Payment Receipt - ${contract.project.title}`,
+        message: `You have released payment of $${contract.terms.amount}. Attached is your invoice.`,
+        attachments: [{
+            filename: `Invoice_${contract._id}.pdf`,
+            content: invoicePdfBase64,
+            encoding: 'base64'
+        }]
+        });
+    } catch (emailErr) {
+        console.log("Invoice email failed, but payment recorded.", emailErr);
+    }
 
-    // Email Invoice
-    await sendEmail({
-      email: contract.client.email, 
-      subject: `Payment Receipt - ${contract.project.title}`,
-      message: `You have released payment of $${contract.terms.amount}. Attached is your invoice.`,
-      attachments: [{
-          filename: `Invoice_${contract._id}.pdf`,
-          content: invoicePdfBase64,
-          encoding: 'base64'
-      }]
-    });
-
-    res.json({ message: 'Payment released and Invoice sent!' });
+    res.json({ message: 'Payment released!' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });

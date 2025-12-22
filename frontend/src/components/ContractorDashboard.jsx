@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
-import { Search, DollarSign, Calendar, Briefcase, CheckCircle, Clock } from 'lucide-react';
+import { Search, DollarSign, Calendar, Briefcase, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 const ContractorDashboard = ({ user }) => {
-  // --- SAFETY SHIELD ---
   if (!user) return null;
 
   const [jobs, setJobs] = useState([]);
@@ -18,7 +17,9 @@ const ContractorDashboard = ({ user }) => {
         setJobs(jobsRes.data.filter(job => job.status === 'OPEN'));
 
         const contractsRes = await api.get('/contracts/my-contracts');
-        setMyContracts(contractsRes.data);
+        // Filter out any contracts where the project was deleted (project is null)
+        const validContracts = contractsRes.data.filter(c => c.project !== null);
+        setMyContracts(validContracts);
       } catch (error) {
         console.error("Failed to load data");
       } finally {
@@ -28,91 +29,94 @@ const ContractorDashboard = ({ user }) => {
     if (user) fetchData();
   }, [user]);
 
+  if (loading) return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       
-      {/* SECTION 1: MY ACTIVE JOBS */}
-      {myContracts.length > 0 && (
-        <div className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                <CheckCircle className="text-green-600" /> My Active Jobs
-            </h2>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {myContracts.map((contract) => (
-                    <div key={contract._id} className="bg-white border-l-4 border-green-500 shadow rounded-lg p-6 relative">
-                        <span className="absolute top-4 right-4 bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded-full">
-                            HIRED
-                        </span>
-                        <h3 className="text-lg font-bold text-gray-900 truncate mb-2">{contract.project.title}</h3>
-                        <p className="text-sm text-gray-500 mb-4">Client: {contract.client.name}</p>
-                        <div className="flex justify-between items-center mb-6">
-                            <span className="text-2xl font-bold text-primary">${contract.terms.amount}</span>
-                            <span className="flex items-center text-sm text-gray-500">
-                                <Clock className="w-4 h-4 mr-1" /> {contract.terms.days} Days
-                            </span>
-                        </div>
-                        <Link 
-                            to={`/projects/${contract.project._id}`}
-                            className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition-colors"
-                        >
-                            Submit Work
-                        </Link>
+      {/* SECTION 1: MY ACTIVE JOBS (Hired) */}
+      <div className="mb-12">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <CheckCircle className="text-green-600" /> My Active Jobs
+        </h2>
+        
+        {myContracts.length === 0 ? (
+           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
+              <p className="text-gray-500">You haven't been hired for any jobs yet.</p>
+           </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {myContracts.map(contract => (
+              <div key={contract._id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden">
+                <div className="p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                      contract.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                      contract.status === 'WORK_SUBMITTED' ? 'bg-purple-100 text-purple-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {contract.status.replace('_', ' ')}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(contract.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  {/* SAFE CHECK: Only render if project exists */}
+                  <h3 className="text-lg font-bold text-gray-900 mb-2 truncate">
+                    {contract.project?.title || "Unknown Project"}
+                  </h3>
+                  
+                  <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex items-center">
+                       <DollarSign className="w-4 h-4 mr-2 text-gray-400" /> 
+                       ${contract.terms.amount}
                     </div>
-                ))}
-            </div>
-        </div>
-      )}
+                    <div className="flex items-center">
+                       <Clock className="w-4 h-4 mr-2 text-gray-400" /> 
+                       {contract.terms.days} Days Timeline
+                    </div>
+                  </div>
 
-      {/* SECTION 2: MARKETPLACE */}
-      <div className="mb-8 border-t pt-8">
-        <h1 className="text-3xl font-bold text-gray-900">Find New Work</h1>
-        <p className="mt-1 text-sm text-gray-500">Browse available work orders and start bidding.</p>
-      </div>
-
-      <div className="mb-8">
-        <div className="mt-1 relative rounded-md shadow-sm max-w-lg">
-          <input
-            type="text"
-            className="focus:ring-primary focus:border-primary block w-full pl-4 sm:text-sm border-gray-300 rounded-lg p-3 border"
-            placeholder="Search for skills, keywords..."
-          />
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="text-center py-12">Loading marketplace...</div>
-      ) : jobs.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
-          <Briefcase className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No new jobs available</h3>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {jobs.map((job) => (
-            <div key={job._id} className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow border border-gray-100 flex flex-col h-full">
-              <div className="p-6 flex-1">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="inline-flex items-center justify-center h-10 w-10 rounded-md bg-blue-100 text-primary">
-                    <Briefcase className="h-6 w-6" />
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">New</span>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 truncate">{job.title}</h3>
-                <p className="mt-1 text-sm text-gray-500 line-clamp-2">{job.description}</p>
-                <div className="mt-4 flex items-center justify-between text-sm">
-                  <div className="flex items-center text-gray-500"><DollarSign className="h-4 w-4 mr-1"/> ${job.budget}</div>
-                  <div className="flex items-center text-gray-500"><Calendar className="h-4 w-4 mr-1"/> Due: {new Date(job.deadline).toLocaleDateString()}</div>
+                  <div className="mt-6 pt-4 border-t border-gray-50">
+                     <Link to={`/projects/${contract.project?._id}`} className="block w-full text-center bg-gray-900 text-white py-2 rounded hover:bg-black transition-colors">
+                        Open Workroom
+                     </Link>
+                  </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-6 py-4 border-t border-gray-100">
-                <Link to={`/projects/${job._id}`} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-blue-800 transition-colors">
-                  View Details & Bid
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 2: MARKETPLACE (Open Jobs) */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Briefcase className="text-blue-600" /> New Opportunities
+        </h2>
+        
+        {jobs.length === 0 ? (
+           <p className="text-gray-500">No open jobs available right now.</p>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {jobs.map(job => (
+              <div key={job._id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{job.title}</h3>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{job.description}</p>
+                <div className="flex justify-between items-center text-sm text-gray-500 mb-4">
+                    <span>Budget: ${job.budget}</span>
+                    <span>Due: {new Date(job.deadline).toLocaleDateString()}</span>
+                </div>
+                <Link to={`/projects/${job._id}`} className="block w-full text-center border border-primary text-primary py-2 rounded hover:bg-blue-50 transition-colors">
+                    View & Bid
                 </Link>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 };
