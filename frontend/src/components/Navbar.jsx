@@ -1,7 +1,8 @@
 import { useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { Briefcase, LogOut } from 'lucide-react';
+import { Briefcase, LogOut, User, LayoutDashboard } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
@@ -9,47 +10,63 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
+    toast.success("Logged out successfully");
     navigate('/login');
   };
 
   return (
-    <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+    <nav className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
+          
+          {/* Logo Section */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2">
               <div className="bg-primary p-2 rounded-lg">
                 <Briefcase className="h-6 w-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900 tracking-tight">Propel</span>
+              <span className="font-bold text-xl text-gray-900 tracking-tight">Propel</span>
             </Link>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Right Side Links */}
+          <div className="flex items-center space-x-4">
             {user ? (
               <>
-                <span className="text-sm text-gray-500 hidden md:block">
-                  Hello, <span className="font-semibold text-gray-900">{user.name}</span>
-                  <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 border border-gray-200">
-                    {user.role}
-                  </span>
+                <span className="text-sm text-gray-500 hidden sm:inline">
+                  Hello, <span className="font-bold text-gray-900">{user.name}</span>
                 </span>
                 
-                <Link to="/dashboard" className="text-gray-600 hover:text-primary font-medium text-sm transition-colors">
-                  Dashboard
+                {/* Role Badge */}
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    user.role === 'Agent' 
+                    ? 'bg-purple-100 text-purple-800' 
+                    : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {user.role}
+                </span>
+
+                <Link 
+                  to="/dashboard" 
+                  className="text-gray-500 hover:text-primary transition-colors flex items-center gap-1"
+                >
+                   <LayoutDashboard className="w-4 h-4" /> Dashboard
                 </Link>
 
-                <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-700 font-medium text-sm transition-colors">
-                  <LogOut className="h-4 w-4" />
-                  Logout
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-red-600 hover:text-red-700 font-medium transition-colors ml-4"
+                >
+                  <LogOut className="h-4 w-4" /> Logout
                 </button>
               </>
             ) : (
               <>
-                <Link to="/login" className="text-gray-600 hover:text-gray-900 font-medium text-sm">
-                  Log In
-                </Link>
-                <Link to="/register" className="bg-primary hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                <Link to="/login" className="text-gray-500 hover:text-gray-900 font-medium">Log in</Link>
+                <Link
+                  to="/register"
+                  className="ml-4 px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-blue-800 transition-colors"
+                >
                   Get Started
                 </Link>
               </>

@@ -58,8 +58,19 @@ const CreateProject = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">Description</label>
-            <textarea name="description" rows="4" required className="mt-1 block w-full border p-3 rounded-md" 
-              placeholder="Detailed requirements..." onChange={handleChange} />
+            {/* FIX APPLIED HERE: Auto-growing textarea */}
+            <textarea 
+                name="description" 
+                rows="3" 
+                required 
+                className="mt-1 block w-full border p-3 rounded-md resize-none overflow-hidden min-h-[100px]" 
+                placeholder="Detailed requirements..." 
+                onChange={(e) => {
+                    handleChange(e);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                }} 
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -81,7 +92,7 @@ const CreateProject = () => {
               placeholder="React, Node.js, MongoDB" onChange={handleChange} />
           </div>
 
-          {/* NEW: Checklist Builder */}
+          {/* Checklist Builder */}
           <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
             <label className="block text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
                 <ListTodo className="h-4 w-4" /> Define Deliverables (Checklist)

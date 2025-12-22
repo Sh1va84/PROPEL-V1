@@ -1,7 +1,7 @@
 const express = require('express');
 const { createProject, getProjects, getProjectById, deleteProject, toggleChecklist } = require('../controllers/projectController');
 const { protect } = require('../middleware/authMiddleware');
-const { authorize } = require('../middleware/roleMiddleware'); // <--- IMPORT FROM ROLE MIDDLEWARE
+const { authorize } = require('../middleware/roleMiddleware'); // <--- CORRECT IMPORT
 
 const router = express.Router();
 

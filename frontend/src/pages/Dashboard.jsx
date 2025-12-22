@@ -1,22 +1,31 @@
 import { useContext } from 'react';
+import { Navigate } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import AgentDashboard from '../components/AgentDashboard';
 import ContractorDashboard from '../components/ContractorDashboard';
 
 const Dashboard = () => {
-  const { user } = useContext(AuthContext);
+  const { user, loading } = useContext(AuthContext);
 
-  if (!user) return <div className="p-10 text-center">Loading user data...</div>;
+  // 1. Wait for auth to check local storage
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen text-gray-500">
+        Loading...
+      </div>
+    );
+  }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {user.role === 'Agent' ? (
-        <AgentDashboard user={user} />
-      ) : (
-        <ContractorDashboard user={user} />
-      )}
-    </div>
-  );
+  // 2. SAFETY CHECK: If logged out, redirect immediately
+  // This prevents the "Crash" because we never try to render the dashboards below
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // 3. Render the correct dashboard based on role
+  return user.role === 'Agent' 
+    ? <AgentDashboard user={user} /> 
+    : <ContractorDashboard user={user} />;
 };
 
 export default Dashboard;

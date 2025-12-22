@@ -5,6 +5,10 @@ import { Plus, Clock, CheckCircle, AlertCircle, FileText, Trash2, Eye } from 'lu
 import { toast } from 'react-hot-toast';
 
 const AgentDashboard = ({ user }) => {
+  // --- SAFETY SHIELD ---
+  // If user is missing (logged out), stop rendering immediately.
+  if (!user) return null; 
+
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -12,18 +16,19 @@ const AgentDashboard = ({ user }) => {
     const fetchMyProjects = async () => {
       try {
         const { data } = await api.get('/projects'); 
+        // Safe check using optional chaining
         const myProjects = data.filter(p => 
           (p.createdBy === user._id) || (p.createdBy?._id === user._id)
         ); 
         setProjects(myProjects);
       } catch (error) {
-        toast.error("Failed to load projects");
+        console.error(error);
       } finally {
         setLoading(false);
       }
     };
-    fetchMyProjects();
-  }, [user._id]);
+    if (user) fetchMyProjects();
+  }, [user]); // Only run if user exists
 
   const handleDelete = async (id) => {
     if(!window.confirm("Are you sure you want to delete this Work Order?")) return;
@@ -54,6 +59,48 @@ const AgentDashboard = ({ user }) => {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5 flex items-center">
+            <div className="flex-shrink-0">
+              <FileText className="h-6 w-6 text-gray-400" />
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">Total Posted</dt>
+                <dd className="text-lg font-medium text-gray-900">{projects.length}</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5 flex items-center">
+            <div className="flex-shrink-0">
+              <Clock className="h-6 w-6 text-yellow-400" />
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">Active Jobs</dt>
+                <dd className="text-lg font-medium text-gray-900">{projects.filter(p => p.status === 'OPEN').length}</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="p-5 flex items-center">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-6 w-6 text-secondary" />
+            </div>
+            <div className="ml-5 w-0 flex-1">
+              <dl>
+                <dt className="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                <dd className="text-lg font-medium text-gray-900">{projects.filter(p => p.status === 'COMPLETED').length}</dd>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white shadow rounded-lg">
         <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
           <h3 className="text-lg leading-6 font-medium text-gray-900">Recent Work Orders</h3>
@@ -72,8 +119,6 @@ const AgentDashboard = ({ user }) => {
               <li key={project._id} className="hover:bg-gray-50 transition-colors">
                 <div className="px-4 py-4 sm:px-6">
                   <div className="flex items-center justify-between">
-                    
-                    {/* LEFT SIDE: Title */}
                     <div className="flex flex-col">
                         <Link 
                           to={`/projects/${project._id}`} 
@@ -83,8 +128,6 @@ const AgentDashboard = ({ user }) => {
                         </Link>
                         <p className="text-xs text-gray-400">ID: {project._id.substring(0, 8)}...</p>
                     </div>
-
-                    {/* RIGHT SIDE: Actions */}
                     <div className="flex items-center gap-3">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                             project.status === 'OPEN' ? 'bg-green-100 text-green-800' : 
@@ -93,8 +136,6 @@ const AgentDashboard = ({ user }) => {
                         }`}>
                             {project.status}
                         </span>
-                        
-                        {/* VIEW BUTTON - The Backup Plan */}
                         <Link 
                            to={`/projects/${project._id}`}
                            className="text-gray-400 hover:text-primary p-2 rounded-full hover:bg-blue-50 transition-colors"
@@ -102,8 +143,6 @@ const AgentDashboard = ({ user }) => {
                         >
                            <Eye className="h-5 w-5" />
                         </Link>
-
-                        {/* DELETE BUTTON */}
                         <button 
                             onClick={() => handleDelete(project._id)}
                             className="text-gray-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
@@ -113,8 +152,6 @@ const AgentDashboard = ({ user }) => {
                         </button>
                     </div>
                   </div>
-                  
-                  {/* Bottom Row Info */}
                   <div className="mt-2 sm:flex sm:justify-between">
                     <div className="sm:flex">
                       <p className="flex items-center text-sm text-gray-500">

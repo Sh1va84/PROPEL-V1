@@ -4,29 +4,29 @@ import api from '../utils/api';
 import { Search, DollarSign, Calendar, Briefcase, CheckCircle, Clock } from 'lucide-react';
 
 const ContractorDashboard = ({ user }) => {
+  // --- SAFETY SHIELD ---
+  if (!user) return null;
+
   const [jobs, setJobs] = useState([]);
-  const [myContracts, setMyContracts] = useState([]); // <--- New State
+  const [myContracts, setMyContracts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Fetch Open Jobs (Marketplace)
         const jobsRes = await api.get('/projects');
         setJobs(jobsRes.data.filter(job => job.status === 'OPEN'));
 
-        // 2. Fetch My Contracts (My Jobs)
         const contractsRes = await api.get('/contracts/my-contracts');
         setMyContracts(contractsRes.data);
-        
       } catch (error) {
         console.error("Failed to load data");
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
-  }, []);
+    if (user) fetchData();
+  }, [user]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
