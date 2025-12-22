@@ -17,7 +17,13 @@ const contractSchema = mongoose.Schema({
   escrowStatus: {
     type: String,
     enum: ['HELD', 'RELEASED', 'REFUNDED'],
-    default: 'HELD' // Money is locked immediately upon hiring
+    default: 'HELD'
+  },
+  // NEW: Store the submitted work here
+  submission: {
+    workLink: String,
+    notes: String,
+    submittedAt: Date
   }
 }, { timestamps: true });
 
