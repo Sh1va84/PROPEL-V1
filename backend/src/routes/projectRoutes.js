@@ -1,5 +1,5 @@
 const express = require('express');
-const { createProject, getProjects, getProjectById, deleteProject } = require('../controllers/projectController');
+const { createProject, getProjects, getProjectById, deleteProject, toggleChecklist } = require('../controllers/projectController');
 const { protect } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/roleMiddleware'); // <--- IMPORT FROM ROLE MIDDLEWARE
 
@@ -12,5 +12,8 @@ router.route('/')
 router.route('/:id')
   .get(getProjectById)
   .delete(protect, deleteProject);
+
+// NEW Route for toggling tasks
+router.route('/:id/checklist').patch(protect, toggleChecklist);
 
 module.exports = router;
