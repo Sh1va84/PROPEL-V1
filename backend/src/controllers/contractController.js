@@ -57,7 +57,6 @@ const deliverWork = async (req, res) => {
     contract.workSubmission = { link: workLink, notes: notes };
     await contract.save();
 
-    // FIX: Save the link to the Project model too!
     await Project.findByIdAndUpdate(projectId, { 
         status: 'WORK_SUBMITTED',
         workSubmissionLink: workLink 
@@ -71,6 +70,7 @@ const deliverWork = async (req, res) => {
 
 const releasePayment = async (req, res) => {
   try {
+    // 1. Find Contract
     let contract = await Contract.findById(req.params.id)
       .populate('project').populate('client').populate('contractor');
     
@@ -85,30 +85,37 @@ const releasePayment = async (req, res) => {
       return res.status(401).json({ message: 'Not Authorized' });
     }
 
+    // 2. Process Payment (Database Update)
     contract.status = 'COMPLETED';
     contract.escrowStatus = 'RELEASED';
     await contract.save();
     
     await Project.findByIdAndUpdate(contract.project._id, { status: 'COMPLETED' });
 
-    // Try/Catch block prevents crashes if Email/PDF fails
+    // 3. SAFETY BLOCK: Generate Invoice (Skipped if it fails)
     try {
-        const invoicePdfBase64 = await generateInvoice(contract.terms, contract.contractor, contract.client);
+        console.log("Attempting to generate invoice...");
+        const invoicePdfBase64 = await generateInvoice(contract, contract.contractor, contract.client);
+        
         await sendEmail({
-        email: contract.client.email, 
-        subject: `Payment Receipt - ${contract.project.title}`,
-        message: `You have released payment of $${contract.terms.amount}. Attached is your invoice.`,
-        attachments: [{
-            filename: `Invoice_${contract._id}.pdf`,
-            content: invoicePdfBase64,
-            encoding: 'base64'
-        }]
+          email: contract.client.email, 
+          subject: `Payment Receipt - ${contract.project.title}`,
+          message: `Payment released. Invoice attached.`,
+          attachments: [{
+             filename: `Invoice_${contract._id}.pdf`,
+             content: invoicePdfBase64,
+             encoding: 'base64'
+          }]
         });
-    } catch (emailErr) {
-        console.log("Invoice email failed, but payment recorded.", emailErr);
+        console.log("Invoice sent successfully.");
+    } catch (invErr) {
+        // THIS CATCH BLOCK PREVENTS THE SERVER CRASH
+        console.error("⚠️ Invoice Generation Failed (Network Issue or Bad Data)."); 
+        console.error("⚠️ Skipping invoice, but Payment was marked as SUCCESS.");
     }
 
-    res.json({ message: 'Payment released!' });
+    res.json({ message: 'Payment released successfully!' });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
