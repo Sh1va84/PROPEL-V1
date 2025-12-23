@@ -110,7 +110,8 @@ const releasePayment = async (req, res) => {
         console.log("Invoice sent successfully.");
     } catch (invErr) {
         // THIS CATCH BLOCK PREVENTS THE SERVER CRASH
-        console.error("⚠️ Invoice Generation Failed (Network Issue or Bad Data)."); 
+        console.warn("Invoice generated successfully, but email was skipped or failed.");
+ 
         console.error("⚠️ Skipping invoice, but Payment was marked as SUCCESS.");
     }
 
