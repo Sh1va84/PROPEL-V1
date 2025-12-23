@@ -4,14 +4,16 @@ import api from '../utils/api';
 import { Search, DollarSign, Calendar, Briefcase, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 const ContractorDashboard = ({ user }) => {
-  if (!user) return null;
-
+  // 1. HOOKS MUST BE AT THE TOP
   const [jobs, setJobs] = useState([]);
   const [myContracts, setMyContracts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
+      // Safety check INSIDE the function, not outside
+      if (!user) return;
+
       try {
         const jobsRes = await api.get('/projects');
         setJobs(jobsRes.data.filter(job => job.status === 'OPEN'));
@@ -26,8 +28,16 @@ const ContractorDashboard = ({ user }) => {
         setLoading(false);
       }
     };
-    if (user) fetchData();
+    
+    if (user) {
+        fetchData();
+    } else {
+        setLoading(false);
+    }
   }, [user]);
+
+  // 2. NOW YOU CAN DO EARLY RETURN (After hooks are declared)
+  if (!user) return null;
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>;
 
@@ -62,7 +72,6 @@ const ContractorDashboard = ({ user }) => {
                     </span>
                   </div>
                   
-                  {/* SAFE CHECK: Only render if project exists */}
                   <h3 className="text-lg font-bold text-gray-900 mb-2 truncate">
                     {contract.project?.title || "Unknown Project"}
                   </h3>

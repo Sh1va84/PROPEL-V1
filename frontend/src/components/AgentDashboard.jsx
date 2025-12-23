@@ -5,15 +5,15 @@ import { Plus, Clock, CheckCircle, AlertCircle, FileText, Trash2, Eye } from 'lu
 import { toast } from 'react-hot-toast';
 
 const AgentDashboard = ({ user }) => {
-  // --- SAFETY SHIELD ---
-  // If user is missing (logged out), stop rendering immediately.
-  if (!user) return null; 
-
+  // 1. HOOKS FIRST
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMyProjects = async () => {
+      // Safety check inside logic
+      if (!user) return; 
+
       try {
         const { data } = await api.get('/projects'); 
         // Safe check using optional chaining
@@ -27,8 +27,13 @@ const AgentDashboard = ({ user }) => {
         setLoading(false);
       }
     };
-    if (user) fetchMyProjects();
-  }, [user]); // Only run if user exists
+    
+    if (user) {
+        fetchMyProjects();
+    } else {
+        setLoading(false);
+    }
+  }, [user]); 
 
   const handleDelete = async (id) => {
     if(!window.confirm("Are you sure you want to delete this Work Order?")) return;
@@ -40,6 +45,9 @@ const AgentDashboard = ({ user }) => {
       toast.error("Failed to delete");
     }
   };
+
+  // 2. NOW CHECK USER
+  if (!user) return null; 
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
