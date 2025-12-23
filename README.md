@@ -8,8 +8,7 @@
 [![Tailwind](https://img.shields.io/badge/Style-Tailwind%20CSS-38bdf8?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com/)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)]()
 
-**Live Demo:** [https://propel-v1-pebl.vercel.app](https://propel-v1-pebl.vercel.app)  
-**Backend API:** [https://propel-backend.onrender.com](https://propel-backend.onrender.com)
+**Live Demo:** [https://propel-v1-pebl.vercel.app](https://propel-v1-pebl.vercel.app) 
 
 ---
 
