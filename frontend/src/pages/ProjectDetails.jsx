@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import AuthContext from '../context/AuthContext';
-import { ArrowLeft, ListTodo, Square, CheckSquare, ExternalLink, CheckCircle, ShieldCheck, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, ListTodo, Square, CheckSquare, ExternalLink, CheckCircle, ShieldCheck, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 const ProjectDetails = () => {
@@ -15,7 +15,6 @@ const ProjectDetails = () => {
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   
-  // Forms
   const [bidAmount, setBidAmount] = useState('');
   const [days, setDays] = useState('');
   const [proposal, setProposal] = useState('');
@@ -27,7 +26,6 @@ const ProjectDetails = () => {
       try {
         const { data } = await api.get(`/projects/${id}`);
         setProject(data);
-        
         if (user && data.createdBy._id === user._id) {
           const bidsRes = await api.get(`/bids/${id}`);
           setBids(bidsRes.data);
@@ -40,7 +38,7 @@ const ProjectDetails = () => {
   const handleToggleTask = async (itemId) => {
     try {
         const { data } = await api.patch(`/projects/${id}/checklist`, { itemId });
-        setProject(data); // Updates checklist UI instantly
+        setProject(data); 
     } catch (error) { toast.error("Failed to update task"); }
   };
 
@@ -67,18 +65,60 @@ const ProjectDetails = () => {
     catch (error) { toast.error("Failed to submit."); }
   };
 
+  // --- INVOICE GENERATION LOGIC ---
   const handleReleasePayment = async () => {
      if(!window.confirm("Release Payment and Generate Invoice?")) return;
      
-     setProcessingPayment(true); // Start Spinner
+     setProcessingPayment(true); 
      try { 
         await api.put(`/contracts/${id}/pay`); 
-        toast.success("Payment Released! Invoice sent to email.");
-        setTimeout(() => window.location.reload(), 1500);
+        
+        setProject(prev => ({ ...prev, status: 'COMPLETED' }));
+        
+        const contractorName = bids.find(b => b.status === 'ACCEPTED')?.contractor.name || 'Contractor';
+        
+        const invoiceText = `
+================================================
+          PROPEL PROPERTY MAINTENANCE
+            OFFICIAL PAYMENT RECEIPT
+================================================
+
+TRANSACTION DETAILS:
+--------------------
+Date:           ${new Date().toLocaleDateString()}
+Status:         PAID (Escrow Released)
+Project ID:     ${project._id}
+
+PROPERTY & WORK DETAILS:
+------------------------
+Issue:          ${project.title}
+Amount Paid:    $${project.budget}
+Category:       Maintenance / Repair
+
+PARTICIPANTS:
+------------------
+From (Client):  ${user.name}
+To (Trade):     ${contractorName}
+------------------
+
+Note: This is a computer-generated receipt.
+Thank you for using PROPEL!
+================================================
+        `;
+        
+        const blob = new Blob([invoiceText], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Receipt_${project.title.replace(/\s+/g, '_')}.txt`;
+        a.click();
+        
+        toast.success("Payment Released & Receipt Downloaded!");
      } 
      catch (error) { 
         toast.error("Failed to release payment"); 
-        setProcessingPayment(false);
+     } finally {
+        setProcessingPayment(false); 
      }
   };
 
@@ -96,8 +136,6 @@ const ProjectDetails = () => {
         <Link to="/dashboard" className="flex items-center text-gray-500 hover:text-gray-900 mb-6">
             <ArrowLeft className="h-4 w-4 mr-2" /> Back to Dashboard
         </Link>
-        
-        {/* HEADER */}
         <div className="bg-white shadow-sm rounded-xl overflow-hidden mb-8 border border-gray-100">
           <div className="px-8 py-8">
             <div className="flex justify-between items-start">
@@ -120,10 +158,7 @@ const ProjectDetails = () => {
                     <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Total Budget</p>
                 </div>
             </div>
-
             <p className="mt-8 text-gray-700 leading-relaxed">{project.description}</p>
-
-            {/* CHECKLIST */}
             {project.checklist && project.checklist.length > 0 && (
                 <div className="mt-8 bg-gray-50 p-6 rounded-xl border border-gray-200">
                     <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -157,25 +192,21 @@ const ProjectDetails = () => {
           </div>
         </div>
 
-        {/* 1. AGENT REVIEW BOX (Improved UI) */}
         {isOwner && isWorkSubmitted && (
              <div className="bg-gradient-to-r from-purple-50 to-white shadow-md rounded-xl p-8 border border-purple-100 mb-8 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10">
                     <ShieldCheck className="w-32 h-32 text-purple-600" />
                 </div>
-                
                 <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-purple-900">
                     <CheckCircle className="text-purple-600"/> Review Work Submission
                 </h3>
                 <p className="text-purple-700 mb-6 max-w-xl">The contractor has submitted the work. Please verify the deliverables before releasing the funds from escrow.</p>
-                
                 <div className="bg-white p-4 rounded-lg border border-purple-200 mb-6 flex items-center justify-between shadow-sm">
-                    <span className="font-mono text-sm text-gray-600">Submission Link</span>
+                    <span className="font-mono text-sm text-gray-600">Completion Photo/Doc</span>
                     <a href={project.workSubmissionLink || "#"} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2 hover:underline">
-                        View Files <ExternalLink className="w-4 h-4" />
+                        View Proof <ExternalLink className="w-4 h-4" />
                     </a>
                 </div>
-
                 <div className="flex gap-4 relative z-10">
                     <button 
                         onClick={handleReleasePayment}
@@ -195,32 +226,30 @@ const ProjectDetails = () => {
              </div>
         )}
 
-        {/* 2. CONTRACTOR WAITING STATE */}
         {isContractor && isWorkSubmitted && (
              <div className="bg-purple-50 border border-purple-200 rounded-xl p-8 mb-8 text-center">
                  <div className="inline-flex p-3 bg-purple-100 rounded-full mb-4">
                     <ShieldCheck className="h-8 w-8 text-purple-600" />
                  </div>
                  <h3 className="text-xl font-bold text-purple-900 mb-2">Work Submitted for Review</h3>
-                 <p className="text-purple-700">The client has been notified. Funds will be released once they approve your work.</p>
+                 <p className="text-purple-700">The property manager has been notified. Funds will be released once they approve your work.</p>
              </div>
         )}
 
-        {/* 3. BIDDING */}
         {isContractor && project.status === 'OPEN' && (
           <div className="bg-white shadow rounded-xl px-8 py-8">
-            <h3 className="text-xl font-bold mb-6">Submit a Proposal</h3>
+            <h3 className="text-xl font-bold mb-6">Submit a Quote</h3>
             <form onSubmit={handlePlaceBid} className="space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Bid Amount ($)</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Quote Amount ($)</label>
                         <div className="relative">
                             <span className="absolute left-3 top-2 text-gray-400">$</span>
                             <input type="number" className="w-full border border-gray-300 pl-6 p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" value={bidAmount} onChange={e=>setBidAmount(e.target.value)} required />
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Time to Complete</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Time to Fix</label>
                         <div className="relative">
                             <input type="number" className="w-full border border-gray-300 p-2 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" value={days} onChange={e=>setDays(e.target.value)} required />
                             <span className="absolute right-3 top-2 text-gray-400 text-sm">Days</span>
@@ -228,40 +257,39 @@ const ProjectDetails = () => {
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cover Letter</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Repair Approach / Notes</label>
                     <textarea 
                         className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all min-h-[100px]" 
-                        placeholder="Explain why you are the best fit for this job..."
+                        placeholder="Detail how you will fix the issue..."
                         value={proposal} 
                         onChange={e => setProposal(e.target.value)} 
                         required 
                     />
                 </div>
                 <button className="w-full bg-gray-900 text-white py-3 rounded-lg font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl">
-                    Submit Proposal
+                    Submit Quote
                 </button>
             </form>
           </div>
         )}
 
-        {/* 4. SUBMIT WORK */}
         {isContractor && project.status === 'IN_PROGRESS' && (
            <div className="bg-white shadow-lg rounded-xl px-8 py-8 border-t-4 border-blue-600">
-             <h3 className="text-xl font-bold mb-4">Submit Work</h3>
+             <h3 className="text-xl font-bold mb-4">Complete Maintenance Job</h3>
              {!allTasksCompleted && (
                  <div className="bg-orange-50 text-orange-800 p-4 rounded-lg mb-6 text-sm flex items-center gap-3 border border-orange-100">
                     <ListTodo className="h-5 w-5"/>
-                    You must complete all deliverables in the checklist above before submitting.
+                    You must complete all checklist items before submitting.
                  </div>
              )}
              <form onSubmit={handleSubmitWork} className="space-y-4">
                <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Work Link (GitHub / Drive / Figma)</label>
-                   <input type="text" placeholder="https://..." className="w-full border border-gray-300 p-2 rounded-lg" value={workLink} onChange={e=>setWorkLink(e.target.value)} required />
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Proof of Work (Photo/Invoice Link)</label>
+                   <input type="text" placeholder="https://drive.google.com/..." className="w-full border border-gray-300 p-2 rounded-lg" value={workLink} onChange={e=>setWorkLink(e.target.value)} required />
                </div>
                <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-1">Submission Notes</label>
-                   <textarea placeholder="Any final notes for the client..." className="w-full border border-gray-300 p-2 rounded-lg min-h-[80px]" value={notes} onChange={e=>setNotes(e.target.value)} required />
+                   <label className="block text-sm font-medium text-gray-700 mb-1">Completion Notes</label>
+                   <textarea placeholder="Work details..." className="w-full border border-gray-300 p-2 rounded-lg min-h-[80px]" value={notes} onChange={e=>setNotes(e.target.value)} required />
                </div>
                <button 
                   disabled={!allTasksCompleted}
@@ -271,38 +299,35 @@ const ProjectDetails = () => {
                       : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   }`}
                >
-                  {allTasksCompleted ? "Submit for Review" : "Complete Checklist First"}
+                  {allTasksCompleted ? "Submit for Approval" : "Complete Checklist First"}
                </button>
              </form>
            </div>
         )}
 
-        {/* 5. AGENT BIDS VIEW */}
         {isOwner && project.status === 'OPEN' && (
           <div className="bg-white shadow rounded-xl px-8 py-8 mt-8">
-            <h3 className="text-xl font-bold mb-6">Received Bids ({bids.length})</h3>
-            {bids.length === 0 ? <p className="text-gray-500 italic">No bids yet.</p> :
+            <h3 className="text-xl font-bold mb-6">Received Quotes ({bids.length})</h3>
+            {bids.length === 0 ? <p className="text-gray-500 italic">No quotes yet.</p> :
               <div className="space-y-4">
                   {bids.map(bid => (
                     <div key={bid._id} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-all bg-gray-50">
                        <div className="flex justify-between items-start mb-4">
                            <div>
                                <h4 className="font-bold text-lg text-gray-900">{bid.contractor.name}</h4>
-                               <p className="text-xs text-gray-500">Applied on {new Date(bid.createdAt).toLocaleDateString()}</p>
+                               <p className="text-xs text-gray-500">Quoted on {new Date(bid.createdAt).toLocaleDateString()}</p>
                            </div>
                            <div className="text-right">
                                <span className="block text-2xl font-bold text-green-600">${bid.bidAmount}</span>
-                               <span className="block text-sm text-gray-500">{bid.daysToComplete} Days delivery</span>
+                               <span className="block text-sm text-gray-500">{bid.daysToComplete} Days to fix</span>
                            </div>
                        </div>
-                       
                        <div className="bg-white p-4 rounded-lg border border-gray-200 mb-4 text-gray-700 italic">
                            "{bid.proposal}"
                        </div>
-
                        <div className="flex justify-end">
                            <button onClick={() => handleHire(bid._id)} className="bg-gray-900 text-white px-6 py-2 rounded-lg font-medium hover:bg-black transition-colors shadow-sm">
-                               Accept & Hire
+                               Accept Quote & Assign
                            </button>
                        </div>
                     </div>
