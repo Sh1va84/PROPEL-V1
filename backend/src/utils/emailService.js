@@ -1,18 +1,18 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-  // If no credentials, log mock email
   if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
     console.log('----------------------------------------------------');
     console.log('⚠️  NO EMAIL SERVER CONFIGURED. MOCK EMAIL SENT:');
     console.log(`To: ${options.email}`);
     console.log(`Subject: ${options.subject}`);
+    if(options.attachments) console.log(`[Attachment: ${options.attachments[0].filename}]`);
     console.log('----------------------------------------------------');
     return;
   }
 
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: 'gmail', 
     auth: {
       user: process.env.SMTP_EMAIL,
       pass: process.env.SMTP_PASSWORD,

@@ -1,11 +1,9 @@
 const Contract = require('../models/Contract');
 const Project = require('../models/Project');
 const Bid = require('../models/Bid');
-const User = require('../models/User'); 
 const { generateInvoice } = require('../utils/invoiceGenerator');
-const sendEmail = require('../utils/emailService'); 
+const sendEmail = require('../utils/emailService');
 
-// Hire Contractor
 const createContract = async (req, res) => {
   try {
     const { bidId } = req.body;
@@ -33,7 +31,6 @@ const createContract = async (req, res) => {
   }
 };
 
-// Get MY Contracts
 const getMyContracts = async (req, res) => {
   try {
     const contracts = await Contract.find({ contractor: req.user._id })
@@ -45,7 +42,6 @@ const getMyContracts = async (req, res) => {
   }
 };
 
-// DELIVER WORK & PROCESS PAYMENT
 const deliverWork = async (req, res) => {
   try {
     const { projectId, workLink, notes } = req.body;
@@ -59,54 +55,74 @@ const deliverWork = async (req, res) => {
 
     if (!contract) return res.status(404).json({ message: 'No active contract found.' });
 
-    // 2. Save Work Details
-    contract.status = 'COMPLETED'; 
-    contract.escrowStatus = 'RELEASED'; 
-    contract.submission = {
-      workLink,
-      notes,
-      submittedAt: new Date()
-    };
+    contract.status = 'WORK_SUBMITTED'; 
+    contract.workSubmission = { link: workLink, notes: notes };
     await contract.save();
 
-    // 3. Update Project Status
-    await Project.findByIdAndUpdate(projectId, { status: 'COMPLETED' });
-
-    // 4. TRANSFER FUNDS (Wallet Simulation)
-    await User.findByIdAndUpdate(contract.client._id, { 
-        $inc: { walletBalance: -contract.terms.amount } 
-    });
-    await User.findByIdAndUpdate(contract.contractor._id, { 
-        $inc: { walletBalance: contract.terms.amount } 
+    await Project.findByIdAndUpdate(projectId, { 
+        status: 'WORK_SUBMITTED',
+        workSubmissionLink: workLink 
     });
 
-    // 5. GENERATE INVOICE PDF
-    const invoiceData = {
-        _id: contract._id,
-        agreedAmount: contract.terms.amount
-    };
-    // Note: ensure generateInvoice in utils is set up correctly
-    const pdfBase64 = await generateInvoice(invoiceData, contract.contractor, contract.client);
+    res.json({ message: 'Work submitted! Waiting for client approval.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
-    // 6. EMAIL THE INVOICE
-    await sendEmail({
-      email: contract.client.email, // Send to Agent
-      subject: `Work Delivered: ${contract._id}`,
-      message: `Hello ${contract.client.name},\n\nThe contractor has submitted the work.\n\nLink: ${workLink}\nNotes: ${notes}\n\nPlease find the invoice attached.`,
-      attachments: [
-        {
-            filename: `Invoice_${contract._id}.pdf`,
-            content: pdfBase64,
-            encoding: 'base64'
-        }
-      ]
-    });
+const releasePayment = async (req, res) => {
+  try {
+    // 1. Find Contract
+    let contract = await Contract.findById(req.params.id)
+      .populate('project').populate('client').populate('contractor');
+    
+    if (!contract) {
+       contract = await Contract.findOne({ project: req.params.id })
+        .populate('project').populate('client').populate('contractor');
+    }
 
-    res.json({ message: 'Work submitted, Payment released, and Invoice sent!' });
+    if (!contract) return res.status(404).json({ message: 'Contract not found' });
+
+    if (contract.client._id.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not Authorized' });
+    }
+
+    // 2. Process Payment (Database Update)
+    contract.status = 'COMPLETED';
+    contract.escrowStatus = 'RELEASED';
+    await contract.save();
+    
+    await Project.findByIdAndUpdate(contract.project._id, { status: 'COMPLETED' });
+
+    // 3. SAFETY BLOCK: Generate Invoice (Skipped if it fails)
+    try {
+        console.log("Attempting to generate invoice...");
+        const invoicePdfBase64 = await generateInvoice(contract, contract.contractor, contract.client);
+        
+        await sendEmail({
+          email: contract.client.email, 
+          subject: `Payment Receipt - ${contract.project.title}`,
+          message: `Payment released. Invoice attached.`,
+          attachments: [{
+             filename: `Invoice_${contract._id}.pdf`,
+             content: invoicePdfBase64,
+             encoding: 'base64'
+          }]
+        });
+        console.log("Invoice sent successfully.");
+    } catch (invErr) {
+        // THIS CATCH BLOCK PREVENTS THE SERVER CRASH
+        console.warn("Invoice generated successfully, but email was skipped or failed.");
+ 
+        console.error("⚠️ Skipping invoice, but Payment was marked as SUCCESS.");
+    }
+
+    res.json({ message: 'Payment released successfully!' });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
   }
 };
 
-module.exports = { createContract, getMyContracts, deliverWork };
+module.exports = { createContract, getMyContracts, deliverWork, releasePayment };
