@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://propel-backend-f8gz.onrender.com',
+  baseURL: 'https://propel-backend-f8gz.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
