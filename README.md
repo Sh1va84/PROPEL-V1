@@ -146,7 +146,7 @@ The application will be available at `http://localhost:5173` (frontend) and `htt
 
 ---
 
-## Roadmap
+## UPCOMING FEATURES
 
 **Phase 1: Core Enhancements**
 - Integration with Stripe Connect for real fiat currency transactions
@@ -176,7 +176,7 @@ Contributions are welcome. Please fork the repository and submit pull requests f
 **Shiva**  
 Full Stack Developer  
 
-[LinkedIn](https://linkedin.com/in/your-profile) • [GitHub](https://github.com/your-username) • [Portfolio](https://your-portfolio.com)
+[LinkedIn](https://www.linkedin.com/in/shiva-619851375/) • [GitHub](https://github.com/Sh1va84) • [Portfolio](https://your-portfolio.com)
 
 ---
 
