@@ -31,11 +31,27 @@ const createContract = async (req, res) => {
   }
 };
 
+// UPDATED: Get contracts for both Contractors and Agents
 const getMyContracts = async (req, res) => {
   try {
-    const contracts = await Contract.find({ contractor: req.user._id })
-      .populate('project')
-      .populate('client', 'name email');
+    let contracts;
+    
+    if (req.user.role === 'Contractor') {
+      // Contractors: Get contracts where they are the contractor
+      contracts = await Contract.find({ contractor: req.user._id })
+        .populate('project')
+        .populate('client', 'name email')
+        .populate('contractor', 'name email');
+    } else if (req.user.role === 'Agent') {
+      // Agents: Get contracts for their projects
+      contracts = await Contract.find({ client: req.user._id })
+        .populate('project')
+        .populate('client', 'name email')
+        .populate('contractor', 'name email');
+    } else {
+      contracts = [];
+    }
+    
     res.json(contracts);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -46,7 +62,6 @@ const deliverWork = async (req, res) => {
   try {
     const { projectId, workLink, notes } = req.body;
     
-    // 1. Find the Contract
     const contract = await Contract.findOne({ 
       project: projectId, 
       contractor: req.user._id,
@@ -56,7 +71,11 @@ const deliverWork = async (req, res) => {
     if (!contract) return res.status(404).json({ message: 'No active contract found.' });
 
     contract.status = 'WORK_SUBMITTED'; 
-    contract.workSubmission = { link: workLink, notes: notes };
+    contract.workSubmission = { 
+      link: workLink, 
+      notes: notes,
+      submittedAt: new Date()
+    };
     await contract.save();
 
     await Project.findByIdAndUpdate(projectId, { 
@@ -72,7 +91,6 @@ const deliverWork = async (req, res) => {
 
 const releasePayment = async (req, res) => {
   try {
-    // 1. Find Contract
     let contract = await Contract.findById(req.params.id)
       .populate('project').populate('client').populate('contractor');
     
@@ -87,14 +105,12 @@ const releasePayment = async (req, res) => {
       return res.status(401).json({ message: 'Not Authorized' });
     }
 
-    // 2. Process Payment (Database Update)
     contract.status = 'COMPLETED';
     contract.escrowStatus = 'RELEASED';
     await contract.save();
     
     await Project.findByIdAndUpdate(contract.project._id, { status: 'COMPLETED' });
 
-    // 3. SAFETY BLOCK: Generate Invoice (Skipped if it fails)
     try {
         console.log("Attempting to generate invoice...");
         const invoicePdfBase64 = await generateInvoice(contract, contract.contractor, contract.client);
@@ -111,9 +127,7 @@ const releasePayment = async (req, res) => {
         });
         console.log("Invoice sent successfully.");
     } catch (invErr) {
-        // THIS CATCH BLOCK PREVENTS THE SERVER CRASH
-        console.warn("Invoice generated successfully, but email was skipped or failed.");
- 
+        console.warn("Invoice generation skipped or failed.");
         console.error("⚠️ Skipping invoice, but Payment was marked as SUCCESS.");
     }
 
