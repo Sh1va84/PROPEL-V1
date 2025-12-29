@@ -1,33 +1,32 @@
 const nodemailer = require('nodemailer');
 
-const sendEmail = async (options) => {
+const sendEmail = async ({ to, subject, message, attachments }) => {
   if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASSWORD) {
-    console.log('----------------------------------------------------');
-    console.log('⚠️  NO EMAIL SERVER CONFIGURED. MOCK EMAIL SENT:');
-    console.log(`To: ${options.email}`);
-    console.log(`Subject: ${options.subject}`);
-    if(options.attachments) console.log(`[Attachment: ${options.attachments[0].filename}]`);
-    console.log('----------------------------------------------------');
+    console.log('⚠️ Email not configured');
     return;
   }
 
+  if (!to) {
+    throw new Error('Recipient email required');
+  }
+
   const transporter = nodemailer.createTransport({
-    service: 'gmail', 
+    service: 'gmail',
     auth: {
       user: process.env.SMTP_EMAIL,
       pass: process.env.SMTP_PASSWORD,
     },
   });
 
-  const message = {
-    from: `${process.env.FROM_NAME} <${process.env.SMTP_EMAIL}>`,
-    to: options.email,
-    subject: options.subject,
-    text: options.message,
-    attachments: options.attachments
-  };
+  await transporter.sendMail({
+    from: `Propel <${process.env.SMTP_EMAIL}>`,
+    to: to,
+    subject: subject,
+    text: message,
+    attachments: attachments
+  });
 
-  await transporter.sendMail(message);
+  console.log('✅ Email sent to:', to);
 };
 
 module.exports = sendEmail;
