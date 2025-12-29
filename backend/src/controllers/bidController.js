@@ -29,12 +29,25 @@ const placeBid = async (req, res) => {
   }
 };
 
-// Get Bids for a specific Project
+// Get Bids for a specific Project (WITH AUTHORIZATION)
 const getBids = async (req, res) => {
   try {
+    // First, find the project
+    const project = await Project.findById(req.params.projectId);
+    
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    
+    // Check if the user is the project owner
+    if (project.createdBy.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to view bids' });
+    }
+    
     const bids = await Bid.find({ project: req.params.projectId })
       .populate('contractor', 'name email')
       .sort({ createdAt: -1 });
+      
     res.json(bids);
   } catch (error) {
     res.status(500).json({ message: error.message });

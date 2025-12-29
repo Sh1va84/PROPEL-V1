@@ -34,18 +34,14 @@ const ProjectDetails = () => {
 
   const fetchProjectDetails = async () => {
     try {
-      // Fetch project
       const projectRes = await api.get(`/projects/${id}`);
       setProject(projectRes.data);
 
-      // Fetch bids
       const bidsRes = await api.get(`/bids/${id}`);
       setBids(bidsRes.data);
 
-      // Fetch contract - try MULTIPLE approaches
       let foundContract = null;
       
-      // Approach 1: Try my-contracts endpoint
       try {
         const contractsRes = await api.get('/contracts/my-contracts');
         foundContract = contractsRes.data.find(c => c.project?._id === id || c.project === id);
@@ -53,20 +49,11 @@ const ProjectDetails = () => {
         console.log('my-contracts failed');
       }
 
-      // Approach 2: If agent and no contract found, check ALL accepted bids
       if (!foundContract && user?.role === 'Agent') {
         const acceptedBid = bidsRes.data.find(b => b.status === 'ACCEPTED');
         if (acceptedBid) {
-          // There's an accepted bid, so contract must exist
-          // Let's try to fetch it differently or create a placeholder
-          console.log('Found accepted bid, contract should exist');
-          
-          // Try fetching contracts again but check project property vs _id
           try {
             const allContracts = await api.get('/contracts/my-contracts');
-            console.log('All contracts:', allContracts.data);
-            
-            // More flexible search
             foundContract = allContracts.data.find(c => {
               const projectId = c.project?._id || c.project;
               return projectId?.toString() === id.toString();
@@ -78,7 +65,6 @@ const ProjectDetails = () => {
       }
 
       setContract(foundContract);
-      console.log('✅ Final contract:', foundContract);
       
     } catch (error) {
       toast.error('Failed to load details');
@@ -121,7 +107,23 @@ const ProjectDetails = () => {
       });
       toast.success('Work submitted!');
       setDeliveryForm({ workLink: '', notes: '' });
-      setTimeout(() => fetchProjectDetails(), 1500);
+      
+      // Update local state immediately
+      setProject(prev => ({ 
+        ...prev, 
+        status: 'WORK_SUBMITTED',
+        workSubmissionLink: deliveryForm.workLink 
+      }));
+      if (contract) {
+        setContract(prev => ({ 
+          ...prev, 
+          status: 'WORK_SUBMITTED',
+          workSubmission: {
+            link: deliveryForm.workLink,
+            notes: deliveryForm.notes
+          }
+        }));
+      }
     } catch (error) {
       toast.error('Failed to submit work');
     }
@@ -129,13 +131,33 @@ const ProjectDetails = () => {
 
   const handleReleasePayment = async () => {
     if (!window.confirm('Release payment? Invoice will be generated.')) return;
+    
+    const loadingToast = toast.loading('Processing payment...');
+    
     try {
-      // Try with contract ID first, then project ID
       const contractId = contract._id || id;
       await api.put(`/contracts/${contractId}/pay`);
-      toast.success('Payment released! Invoice sent.');
-      setTimeout(() => fetchProjectDetails(), 1500);
+      
+      toast.dismiss(loadingToast);
+      toast.success('✅ Payment released! Invoice sent.');
+      
+      // OPTIMISTIC UPDATE - Update UI immediately
+      setProject(prev => ({ ...prev, status: 'COMPLETED' }));
+      if (contract) {
+        setContract(prev => ({ 
+          ...prev, 
+          status: 'COMPLETED',
+          escrowStatus: 'RELEASED'
+        }));
+      }
+      
+      // Optionally refresh after 1 second to ensure sync
+      setTimeout(() => {
+        fetchProjectDetails();
+      }, 1000);
+      
     } catch (error) {
+      toast.dismiss(loadingToast);
       toast.error('Failed to release payment');
     }
   };
@@ -166,7 +188,6 @@ const ProjectDetails = () => {
     contract.contractor === user?._id
   );
 
-  // IMPORTANT: Check if there's an accepted bid (means contract exists even if not loaded)
   const hasAcceptedBid = bids.some(b => b.status === 'ACCEPTED');
 
   return (
@@ -307,7 +328,7 @@ const ProjectDetails = () => {
             </div>
           )}
 
-          {/* Submit Work - Show if contractor AND (has contract OR project is IN_PROGRESS) */}
+          {/* Submit Work */}
           {isContractor && (contract?.status === 'ACTIVE' || project.status === 'IN_PROGRESS') && project.status !== 'WORK_SUBMITTED' && project.status !== 'COMPLETED' && (
             <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl shadow-lg border-2 border-green-400 p-6">
               <div className="flex items-center gap-3 mb-4">
@@ -375,7 +396,7 @@ const ProjectDetails = () => {
             </div>
           )}
 
-          {/* Review & Pay (Agent View) - Show if project is WORK_SUBMITTED */}
+          {/* Review & Pay (Agent View) */}
           {isPropertyManager && project.status === 'WORK_SUBMITTED' && (
             <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl shadow-lg border-2 border-yellow-400 p-6">
               <div className="flex items-center gap-3 mb-4">
