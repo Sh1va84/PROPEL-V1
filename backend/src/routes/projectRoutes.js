@@ -1,19 +1,19 @@
 const express = require('express');
-const { createProject, getProjects, getProjectById, deleteProject, toggleChecklist } = require('../controllers/projectController');
+const { createProject, getProjects, getProjectById, updateChecklistItem, deleteProject } = require('../controllers/projectController');
 const { protect } = require('../middleware/authMiddleware');
-const { authorize } = require('../middleware/roleMiddleware'); // <--- CORRECT IMPORT
 
 const router = express.Router();
 
+// Simple Routes: Get All & Create
 router.route('/')
-  .post(protect, authorize('Agent', 'Admin'), createProject)
-  .get(getProjects);
+  .get(getProjects)
+  .post(protect, createProject);
 
+// Single Project Operations
 router.route('/:id')
   .get(getProjectById)
-  .delete(protect, deleteProject);
+  .delete(protect, deleteProject); // DELETE ROUTE ADDED
 
-// NEW Route for toggling tasks
-router.route('/:id/checklist').patch(protect, toggleChecklist);
+router.patch('/:id/checklist', protect, updateChecklistItem);
 
 module.exports = router;
